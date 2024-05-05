@@ -17,6 +17,12 @@ app.use('/public', express.static(`${process.cwd()}/public`));
 
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function() {
+  console.log('Connected to MongoDB successfully!');
+});
+
 const urlSchema = new mongoose.Schema({
   original: { type: String, required: true },
   short: Number
@@ -40,9 +46,15 @@ app.post('/api/shorturl', (req, res) => {
     if (err) {
       return res.status(404).json({ error: 'invalid url' });
     } else {
-      const url = new Url({ original: req.body.url, short: 1 });
-      url.save((err, data) => {
-        return err ? res.status(500).json({ error: 'Failed to save to database' }) : res.json({ original_url: data.original, short_url: data.short });
+      Url.countDocuments({}, (err, count) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to count documents' });
+        } else {
+          const url = new Url({ original: req.body.url, short: count + 1 });
+          url.save((err, data) => {
+            return err ? res.status(500).json({ error: 'Failed to save to database' }) : res.json({ original_url: data.original, short_url: data.short });
+          });
+        }
       });
     }
   });
